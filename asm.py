@@ -176,6 +176,10 @@ class Opcode(IntEnum):
     ADDI = (BASE_ADD << 4 | 0x01)
 
     BRANCH = (BASE_BRANCH << 4 | 0x00)
+    BRANCH_LESS_THAN = (BASE_BRANCH << 4 | 0x01)
+    BRANCH_GREATER_THAN = (BASE_BRANCH << 4 | 0x02)
+    BRANCH_EQUAL_TO = (BASE_BRANCH << 4 | 0x03)
+    BRANCH_NOT_EQUAL_TO = (BASE_BRANCH << 4 | 0x04)
 
     CMP  = ((BASE_COMPARE << 4) | 0x00)
     CMPI = ((BASE_COMPARE << 4) | 0x01)
@@ -220,8 +224,18 @@ class ISys(Instruction):
 
 
 class IBranch(Instruction):
+    DIRECT = Opcode.BRANCH.value
+    LESS_THAN = Opcode.BRANCH_LESS_THAN.value
+    GREATER_THAN = Opcode.BRANCH_GREATER_THAN.value
+    EQUAL_TO = Opcode.BRANCH_EQUAL_TO.value
+    NOT_EQUAL_TO = Opcode.BRANCH_NOT_EQUAL_TO.value
+
+    def __init__(self, ident, operation):
+        super().__init__(ident)
+        self.operation = operation
+
     def parse(self, cg):
-        cg.write(Opcode.BRANCH.value)
+        cg.write(self.operation)
 
         label_ident: str = cg.eat(TokenType.IDENTIFIER).as_str
         # label = next(x for x in cg.labels if x.name == label_ident)
@@ -252,8 +266,12 @@ class CodeGen:
         IPop('pop'),
         IAddi('addi'),
         ISys('sys'),
-        IBranch('b'),
         ICmpi('cmpi'),
+        IBranch('b', IBranch.DIRECT),
+        IBranch('blt', IBranch.LESS_THAN),
+        IBranch('bgt', IBranch.GREATER_THAN),
+        IBranch('be', IBranch.EQUAL_TO),
+        IBranch('bne', IBranch.NOT_EQUAL_TO),
     ]
 
     def __init__(self, tokens):

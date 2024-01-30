@@ -25,7 +25,11 @@
 #define OP_ADD   ((OP_BASE_ADD << 4)  | 0x00)
 #define OP_ADDI  ((OP_BASE_ADD << 4)  | 0x01)
 
-#define OP_BRANCH ((OP_BASE_BRANCH << 4) | 0x00)
+#define OP_BRANCH               ((OP_BASE_BRANCH << 4) | 0x00)
+#define OP_BRANCH_LESS_THAN     ((OP_BASE_BRANCH << 4) | 0x01)
+#define OP_BRANCH_GREATER_THAN  ((OP_BASE_BRANCH << 4) | 0x02)
+#define OP_BRANCH_EQUAL_TO      ((OP_BASE_BRANCH << 4) | 0x03)
+#define OP_BRANCH_NOT_EQUAL_TO  ((OP_BASE_BRANCH << 4) | 0x04)
 
 #define OP_CMP    ((OP_BASE_COMPARE << 4) | 0x00)
 #define OP_CMPI   ((OP_BASE_COMPARE << 4) | 0x01)
@@ -50,6 +54,14 @@ typedef struct {
     vm_register_file_t regs;
     uint8_t flags;
 } vm_t;
+
+typedef enum {
+    VM_BRANCH_MODE_DIRECT = 0,
+    VM_BRANCH_MODE_LESS_THAN = 1,
+    VM_BRANCH_MODE_GREATER_THAN = 2,
+    VM_BRANCH_MODE_EQUAL_TO = 3,
+    VM_BRANCH_MODE_NOT_EQUAL_TO = 4
+} vm_branch_mode_t;
 
 vm_t vm_new(uint16_t memory_size) {
     vm_t vm;
@@ -149,13 +161,32 @@ void vm_op_sys(vm_t *vm) {
     }
 }
 
-void vm_op_branch(vm_t *vm) {
-    uint16_t location = vm_fetch16(vm);
+void vm_jump_to(vm_t *vm, uint16_t location) {
     // jump to new location
     vm->regs.pc = location;
 
     // reset compare flags
     VM_RESET_CMP_FLAGS(vm);
+}
+
+void vm_op_branch(vm_t *vm, vm_branch_mode_t mode) {
+    uint16_t location = vm_fetch16(vm);
+
+    if (mode == VM_BRANCH_MODE_DIRECT) {
+        vm_jump_to(vm, location);
+    }
+    else if (mode == VM_BRANCH_MODE_LESS_THAN && VM_LESS_THAN(vm)) {
+        vm_jump_to(vm, location);
+    }
+    else if (mode == VM_BRANCH_MODE_GREATER_THAN && VM_GREATER_THAN(vm)) {
+        vm_jump_to(vm, location);
+    }
+    else if (mode == VM_BRANCH_MODE_EQUAL_TO && VM_EQUAL(vm)) {
+        vm_jump_to(vm, location);
+    }
+    else if (mode == VM_BRANCH_MODE_NOT_EQUAL_TO && VM_NOT_EQUAL(vm)) {
+        vm_jump_to(vm, location);
+    }
 }
 
 void vm_op_cmpi(vm_t *vm) {
@@ -225,7 +256,19 @@ void vm_step(vm_t *vm) {
             break;
 
         case OP_BRANCH:
-            vm_op_branch(vm);
+            vm_op_branch(vm, VM_BRANCH_MODE_DIRECT);
+            break;
+        case OP_BRANCH_LESS_THAN:
+            vm_op_branch(vm, VM_BRANCH_MODE_LESS_THAN);
+            break;
+        case OP_BRANCH_GREATER_THAN:
+            vm_op_branch(vm, VM_BRANCH_MODE_GREATER_THAN);
+            break;
+        case OP_BRANCH_EQUAL_TO:
+            vm_op_branch(vm, VM_BRANCH_MODE_EQUAL_TO);
+            break;
+        case OP_BRANCH_NOT_EQUAL_TO:
+            vm_op_branch(vm, VM_BRANCH_MODE_NOT_EQUAL_TO);
             break;
 
         case OP_CMPI:

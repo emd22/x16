@@ -2,7 +2,11 @@
 pushi 10
 pop x0
 
-cmpi 9, x0
+addloop:
+addi 1, x0
+
+cmpi 12, x0
+blt addloop
 
 ; halt the vm
 sys 0
