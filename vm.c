@@ -233,7 +233,7 @@ int main(int argc, char *argv[]) {
     vm.regs.sp = 0x5000;
 
     uint16_t program_size;
-    uint8_t *program = load_program("../demo.bin", &program_size);
+    uint8_t *program = load_program("demo.bin", &program_size);
     // load our program into the vm
     vm_load_program(&vm, 0x00, program, program_size);
 

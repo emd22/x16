@@ -9,3 +9,5 @@ addi 10, x0
 ; halt the vm
 sys 0
 
+.str "test"
+

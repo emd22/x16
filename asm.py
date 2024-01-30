@@ -39,7 +39,7 @@ class Token:
 
 class Lexer:
     def __init__(self, buffer):
-        self.splits = ".,+-*/=(){};"
+        self.splits = ",+-*/=(){};"
         self.ws = " \t\n\0"
         self.buffer = buffer
         self.tokens = []
@@ -228,6 +228,8 @@ class IBranch(Instruction):
         pass
 
 
+
+
 class CodeGen:
     instructions = [
         IPushi('pushi'),
@@ -275,12 +277,27 @@ class CodeGen:
             self.source[label.location + 1] = value & 0xFF
         pass
 
+    def parse_preproc(self, ident):
+        ident_str = ident.as_str
+        if ident_str == '.str':
+            # get the string minus the quotes
+            data = self.eat(TokenType.STRING).as_str[1:-1]
+            # for each char, add the ascii value to our program
+            for ch in data:
+                self.source.append(ord(ch))
+            # append the null terminator
+            self.source.append(0)
+
     def parse_label(self, ident):
         label = Label(ident.as_str[:-1], len(self.source))
         self.labels.append(label)
 
     def parse_instr(self):
         ident: Token = self.eat(TokenType.IDENTIFIER)
+
+        if ident.as_str[0] == '.':
+            self.parse_preproc(ident)
+            return
 
         if ident.as_str[-1] == ':':
             self.parse_label(ident)
