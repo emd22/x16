@@ -8,6 +8,8 @@
 #define OP_BASE_PUSH 1
 #define OP_BASE_POP  2
 #define OP_BASE_ADD  3
+#define OP_SYS       4
+#define OP_BASE_BRANCH 5
 
 #define OP_NOP   (0x00)
 
@@ -19,7 +21,8 @@
 #define OP_ADD   ((OP_BASE_ADD << 4)  | 0x00)
 #define OP_ADDI  ((OP_BASE_ADD << 4)  | 0x01)
 
-#define OP_SYS   0x04
+#define OP_BRANCH ((OP_BASE_BRANCH << 4) | 0x00)
+
 
 typedef uint16_t vm_register_t;
 
@@ -133,6 +136,11 @@ void vm_op_sys(vm_t *vm) {
     }
 }
 
+void vm_op_branch(vm_t *vm) {
+    uint16_t location = vm_fetch16(vm);
+    vm->regs.pc = location;
+}
+
 void vm_print_debug(vm_t *vm) {
     printf(
             "[ x0: 0x%02X x1: 0x%02X x2: 0x%02X x3: 0x%02X "
@@ -173,6 +181,10 @@ void vm_step(vm_t *vm) {
 
         case OP_SYS:
             vm_op_sys(vm);
+            break;
+
+        case OP_BRANCH:
+            vm_op_branch(vm);
             break;
 
         default:

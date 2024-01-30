@@ -153,12 +153,19 @@ class Register(IntEnum):
         return Register.NONE
 
 
+class Label:
+    def __init__(self, name, location):
+        self.name = name
+        self.location = location
+
+
 class Opcode(IntEnum):
     NONE = 0x00
     BASE_PUSH = 0x01
     BASE_POP = 0x02
     BASE_ADD = 0x03
     SYS = 0x04
+    BASE_BRANCH = 0x05
 
     PUSH = (BASE_PUSH << 4 | 0x00)
     PUSHI = (BASE_PUSH << 4 | 0x01)
@@ -167,6 +174,8 @@ class Opcode(IntEnum):
     ADD = (BASE_ADD << 4 | 0x00)
     ADDI = (BASE_ADD << 4 | 0x01)
 
+    BRANCH = (BASE_BRANCH << 4 | 0x00)
+
 
 class IPushi(Instruction):
     def parse(self, cg):
@@ -174,7 +183,7 @@ class IPushi(Instruction):
         # write value passed to instruction
         value: int = cg.eat(TokenType.NUMBER).as_int
         cg.write16(value)
-        pass
+
 
 class IPop(Instruction):
     def parse(self, cg):
@@ -182,6 +191,7 @@ class IPop(Instruction):
         reg_ident = cg.eat(TokenType.IDENTIFIER).as_str
         # write only our destination register
         cg.write_reg(Register.NONE.value, Register.get(reg_ident))
+
 
 class IAddi(Instruction):
     def parse(self, cg):
@@ -195,6 +205,7 @@ class IAddi(Instruction):
         reg_ident: str = cg.eat(TokenType.IDENTIFIER).as_str
         cg.write_reg(Register.NONE.value, Register.get(reg_ident))
 
+
 class ISys(Instruction):
     def parse(self, cg):
         cg.write(Opcode.SYS.value)
@@ -203,18 +214,35 @@ class ISys(Instruction):
         cg.write(value)
         pass
 
+
+class IBranch(Instruction):
+    def parse(self, cg):
+        cg.write(Opcode.BRANCH.value)
+
+        label_ident: str = cg.eat(TokenType.IDENTIFIER).as_str
+        # label = next(x for x in cg.labels if x.name == label_ident)
+        cg.labels_to_update.append(Label(label_ident, len(cg.source)))
+
+        # write a dummy value and update when the label is defined
+        cg.write16(0x00)
+        pass
+
+
 class CodeGen:
     instructions = [
         IPushi('pushi'),
         IPop('pop'),
         IAddi('addi'),
         ISys('sys'),
+        IBranch('b'),
     ]
 
     def __init__(self, tokens):
         self.tokens = tokens
         self.index = 0
         self.source = []
+        self.labels: [Label] = []
+        self.labels_to_update: [Label] = []
 
     @property
     def next(self):
@@ -233,20 +261,43 @@ class CodeGen:
             exit(1)
         return token
 
+    def get_label_location(self, name) -> int:
+        for label in self.labels:
+            if label.name == name:
+                return label.location
+        return 0
+
+    # go through each label and update the compiled references to the correct location
+    def update_labels(self):
+        for label in self.labels_to_update:
+            value = self.get_label_location(label.name)
+            self.source[label.location] = (value << 8) & 0xFF
+            self.source[label.location + 1] = value & 0xFF
+        pass
+
+    def parse_label(self, ident):
+        label = Label(ident.as_str[:-1], len(self.source))
+        self.labels.append(label)
+
     def parse_instr(self):
         ident: Token = self.eat(TokenType.IDENTIFIER)
+
+        if ident.as_str[-1] == ':':
+            self.parse_label(ident)
+            return
+
         for op in CodeGen.instructions:
             if op.ident == ident.data:
                 op.parse(self)
                 return
+
         print(f'Could not find instruction "{ident.as_str}"!')
         exit(1)
-        pass
 
     def gen(self):
         while self.has_next:
             self.parse_instr()
-        pass
+        self.update_labels()
 
     def write(self, value: int):
         self.source.append(value & 0xFF)
