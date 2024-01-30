@@ -1,11 +1,10 @@
 ; jump over our data
 b start
 
-.str "test"
+.str "Hello, World!"
 .str ""
 
 start:
-
 pushi   0
 pop     sp            ; load zero into our stack pointer
 
