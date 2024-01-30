@@ -2,7 +2,6 @@
 b start
 
 .str "Hello, World!"
-.str ""
 
 start:
 pushi   0
@@ -13,6 +12,7 @@ addi    1, sp         ; go to the first character
 
 printc:
     pop     x0            ; pop what is currently on our stack into x0
+    andi    0x00FF, x0    ; check only the bottom byte
     cmpi    0, x0         ; check if the word we loaded is zero
     be      done          ; must be a null terminator, finish
     sys     1             ; character print syscall, and x0 is our data

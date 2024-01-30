@@ -1,0 +1,7 @@
+sys     2
+
+pushi   0x0a
+pop     x0
+andi    0x03, x0
+
+sys     0

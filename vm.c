@@ -9,12 +9,14 @@
 #define VM_FLAG_LESS_THAN 0x40
 #define VM_FLAG_GREATER_THAN 0x80
 
-#define OP_BASE_PUSH 1
-#define OP_BASE_POP  2
-#define OP_BASE_ADD  3
-#define OP_SYS       4
-#define OP_BASE_BRANCH 5
+#define OP_BASE_PUSH    1
+#define OP_BASE_POP     2
+#define OP_BASE_ADD     3
+#define OP_SYS          4
+#define OP_BASE_BRANCH  5
 #define OP_BASE_COMPARE 6
+#define OP_BASE_AND     7
+#define OP_BASE_OR      8
 
 #define OP_NOP   (0x00)
 
@@ -34,6 +36,9 @@
 
 #define OP_CMP    ((OP_BASE_COMPARE << 4) | 0x00)
 #define OP_CMPI   ((OP_BASE_COMPARE << 4) | 0x01)
+
+#define OP_ANDI   ((OP_BASE_AND << 4) | 0x01)
+#define OP_ORI    ((OP_BASE_OR << 4) | 0x01)
 
 #define VM_GREATER_THAN(vm) (vm->flags & VM_FLAG_GREATER_THAN)
 #define VM_LESS_THAN(vm) (vm->flags & VM_FLAG_LESS_THAN)
@@ -63,6 +68,11 @@ typedef enum {
     VM_BRANCH_MODE_EQUAL_TO = 3,
     VM_BRANCH_MODE_NOT_EQUAL_TO = 4
 } vm_branch_mode_t;
+
+typedef enum {
+    VM_BITWISE_TYPE_AND = 0,
+    VM_BITWISE_TYPE_OR  = 1,
+} vm_bitwise_type_t;
 
 vm_t vm_new(uint16_t memory_size) {
     vm_t vm;
@@ -219,6 +229,25 @@ void vm_op_cmpi(vm_t *vm) {
     }
 }
 
+void vm_op_bitwisei(vm_t *vm, vm_bitwise_type_t type) {
+    uint16_t imm = vm_fetch16(vm);
+
+    int ri = vm_fetch8(vm) & 0x0F;
+
+    uint16_t *reg = vm_register_from_index(vm, ri);
+    if (reg == NULL) {
+        printf("Invalid register %d\n", ri);
+        return;
+    }
+
+    if (type == VM_BITWISE_TYPE_AND) {
+        (*reg) &= imm;
+    }
+    else if (type == VM_BITWISE_TYPE_OR) {
+        (*reg) |= imm;
+    }
+}
+
 void vm_print_debug(vm_t *vm) {
     printf(
             "[ x0: 0x%02X x1: 0x%02X x2: 0x%02X x3: 0x%02X "
@@ -284,6 +313,14 @@ void vm_step(vm_t *vm) {
             vm_op_cmpi(vm);
             break;
 
+        case OP_ANDI:
+            vm_op_bitwisei(vm, VM_BITWISE_TYPE_AND);
+            break;
+
+        case OP_ORI:
+            vm_op_bitwisei(vm, VM_BITWISE_TYPE_OR);
+            break;
+
         default:
             printf("Error: garbage value [0x%02X] in opcode stream\n", opcode);
             break;
@@ -330,7 +367,7 @@ int main(int argc, char *argv[]) {
     vm.regs.sp = 0x5000;
 
     uint16_t program_size;
-    uint8_t *program = load_program("demo.bin", &program_size);
+    uint8_t *program = load_program("demos/print/helloworld.bin", &program_size);
     // load our program into the vm
     vm_load_program(&vm, 0x00, program, program_size);
 

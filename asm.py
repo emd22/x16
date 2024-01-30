@@ -115,6 +115,9 @@ class Lexer:
             token.type = TokenType.NUMBER
         elif data in symbols:
             token.type = TokenType.SYMBOL
+        elif data[0] == '0' and data[1] == 'x' and len(data) > 2:
+            token.data = int(token.data, 16)
+            token.type = TokenType.NUMBER
         else:
             token.type = TokenType.IDENTIFIER
         return token
@@ -167,6 +170,8 @@ class Opcode(IntEnum):
     SYS = 0x04
     BASE_BRANCH = 0x05
     BASE_COMPARE = 0x06
+    BASE_AND = 0x07
+    BASE_OR = 0x08
 
     PUSH = (BASE_PUSH << 4 | 0x00)
     PUSHI = (BASE_PUSH << 4 | 0x01)
@@ -183,6 +188,9 @@ class Opcode(IntEnum):
 
     CMP  = ((BASE_COMPARE << 4) | 0x00)
     CMPI = ((BASE_COMPARE << 4) | 0x01)
+
+    ANDI = ((BASE_AND << 4) | 0x01)
+    ORI = ((BASE_OR << 4) | 0x01)
 
 
 class IPushi(Instruction):
@@ -260,6 +268,27 @@ class ICmpi(Instruction):
         pass
 
 
+class IBitwiseI(Instruction):
+    AND = Opcode.ANDI.value
+    OR = Opcode.ORI.value
+
+    def __init__(self, ident, operation):
+        super().__init__(ident)
+        self.operation = operation
+
+    def parse(self, cg):
+        cg.write(self.operation)
+
+        value: int = cg.eat(TokenType.NUMBER).as_int
+        cg.write16(value)
+
+        cg.eat(TokenType.COMMA)
+        # write our register value
+        reg_ident: str = cg.eat(TokenType.IDENTIFIER).as_str
+        cg.write_reg(Register.NONE.value, Register.get(reg_ident))
+        pass
+
+
 class CodeGen:
     instructions = [
         IPushi('pushi'),
@@ -272,6 +301,8 @@ class CodeGen:
         IBranch('bgt', IBranch.GREATER_THAN),
         IBranch('be', IBranch.EQUAL_TO),
         IBranch('bne', IBranch.NOT_EQUAL_TO),
+        IBitwiseI('andi', IBitwiseI.AND),
+        IBitwiseI('ori', IBitwiseI.OR),
     ]
 
     def __init__(self, tokens):
@@ -369,18 +400,18 @@ class CodeGen:
 
 
 def main():
-    source_file = open('demo.dS', 'r')
+    source_file = open('demos/print/helloworld.dS', 'r')
     lexer = Lexer(source_file.read())
     lexer.lex()
 
-    print('Tokens:')
-    lexer.print()
+    # print('Tokens:')
+    # lexer.print()
 
     cg = CodeGen(lexer.tokens)
     cg.gen()
-    print(f'generated code: {cg.source}')
+    # print(f'generated code: {cg.source}')
 
-    cg.save('demo.bin')
+    cg.save('demos/print/helloworld.bin')
 
 
 if __name__ == "__main__":
