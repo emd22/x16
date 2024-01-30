@@ -1,7 +1,19 @@
-sys     2
+b _begin
 
-pushi   0x0a
-pop     x0
-andi    0x03, x0
+.str "test"
+
+_begin:
+
+push sp
+pop x3
+
+pushi 5
+pop sp
+
+pop x0
+sys 1
+
+push x3
+pop sp
 
 sys     0

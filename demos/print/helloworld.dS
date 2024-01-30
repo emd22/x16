@@ -4,6 +4,10 @@ b start
 .str "Hello, World!"
 
 start:
+
+push    sp
+pop     x3            ; save our stack pointer into x3
+
 pushi   0
 pop     sp            ; load zero into our stack pointer
 
@@ -17,13 +21,17 @@ printc:
     be      done          ; must be a null terminator, finish
     sys     1             ; character print syscall, and x0 is our data
     addi    3, sp         ; increment our pointer and correct from popping the word
-    b       printc       ; print our next character
+    b       printc        ; print our next character
 done:
+
+push    x3
+pop     sp            ; return our stack pointer
 
 ; print a newline. because x0 will be zero, we can set it
 ; in one instruction as opposed to two
 addi    10, x0
 sys     1
+
 
 sys     0             ; halt the VM
 

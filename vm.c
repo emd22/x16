@@ -120,14 +120,37 @@ uint16_t vm_fetch16(vm_t *vm) {
 }
 
 uint8_t vm_pop8(vm_t *vm) {
-    uint8_t value = vm->memory[vm->regs.sp];
-    vm->regs.sp--;
+    uint8_t value = vm->memory[--vm->regs.sp];
     return value;
 }
 
 uint16_t vm_pop16(vm_t *vm) {
-    // remember, popping reverses the byte order!
-    return ((vm_pop8(vm) << 8) | vm_pop8(vm));
+    return vm_pop8(vm) | ((uint16_t)vm_pop8(vm) << 8);
+}
+
+void vm_print_stack(vm_t *vm) {
+    printf("Stack: ");
+    for (int i = 0x5000; i < vm->regs.sp; i++) {
+        printf("%02X ", vm->memory[i]);
+    }
+    printf("\n");
+}
+
+void vm_op_push(vm_t *vm) {
+    int ri = vm_fetch8(vm) & 0x0F;
+
+    uint16_t *reg = vm_register_from_index(vm, ri);
+    if (reg == NULL) {
+        printf("Invalid register %d\n", ri);
+        return;
+    }
+    uint16_t value = *reg;
+
+
+    vm->memory[vm->regs.sp++] = (value >> 8) & 0xFF;
+    vm->memory[vm->regs.sp++] = value & 0xFF;
+
+//    vm_print_stack(vm);
 }
 
 void vm_op_pushi(vm_t *vm) {
@@ -145,6 +168,9 @@ void vm_op_pop(vm_t *vm) {
     }
 
     (*reg) = vm_pop16(vm);
+
+//    vm_print_stack(vm);
+
 }
 
 void vm_op_addi(vm_t *vm) {
@@ -206,6 +232,31 @@ void vm_op_branch(vm_t *vm, vm_branch_mode_t mode) {
     }
 }
 
+void vm_op_cmp(vm_t *vm) {
+    int registers = vm_fetch8(vm);
+
+    uint8_t srci = registers >> 4;
+    uint8_t desti = registers & 0x0F;
+
+    uint16_t *reg_src = vm_register_from_index(vm, srci);
+    uint16_t *reg_dest = vm_register_from_index(vm, desti);
+    if (reg_src == NULL || reg_dest == NULL) {
+        printf("Invalid register(s) %d, %d\n", srci, desti);
+        return;
+    }
+
+    VM_RESET_CMP_FLAGS(vm);
+
+    int cmp_value = ((int)(*reg_src)) - (*reg_dest);
+
+    if (cmp_value < 0) {
+        vm->flags |= VM_FLAG_LESS_THAN;
+    }
+    else if (cmp_value > 0) {
+        vm->flags |= VM_FLAG_GREATER_THAN;
+    }
+}
+
 void vm_op_cmpi(vm_t *vm) {
     uint16_t imm = vm_fetch16(vm);
 
@@ -250,8 +301,8 @@ void vm_op_bitwisei(vm_t *vm, vm_bitwise_type_t type) {
 
 void vm_print_debug(vm_t *vm) {
     printf(
-            "[ x0: 0x%02X x1: 0x%02X x2: 0x%02X x3: 0x%02X "
-            ":: sp: 0x%02X bp: 0x%02X pc: 0x%02X] || fl:0x%02X\n",
+            "[ x0: 0x%04X x1: 0x%04X x2: 0x%04X x3: 0x%04X "
+            ":: sp: 0x%04X bp: 0x%04X pc: 0x%04X] || fl:0x%02X\n",
             vm->regs.x0,
             vm->regs.x1,
             vm->regs.x2,
@@ -275,6 +326,7 @@ void vm_step(vm_t *vm) {
             return;
 
         case OP_PUSH:
+            vm_op_push(vm);
             break;
 
         case OP_PUSHI:
@@ -307,6 +359,10 @@ void vm_step(vm_t *vm) {
             break;
         case OP_BRANCH_NOT_EQUAL_TO:
             vm_op_branch(vm, VM_BRANCH_MODE_NOT_EQUAL_TO);
+            break;
+
+        case OP_CMP:
+            vm_op_cmp(vm);
             break;
 
         case OP_CMPI:

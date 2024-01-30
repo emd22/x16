@@ -192,6 +192,14 @@ class Opcode(IntEnum):
     ANDI = ((BASE_AND << 4) | 0x01)
     ORI = ((BASE_OR << 4) | 0x01)
 
+class IPush(Instruction):
+    def parse(self, cg):
+        cg.write(Opcode.PUSH.value)
+        reg_ident = cg.eat(TokenType.IDENTIFIER).as_str
+        print(f'ident: {reg_ident} :: {Register.get(reg_ident)}')
+        # write only our destination register
+        cg.write_reg(Register.NONE.value, Register.get(reg_ident))
+
 
 class IPushi(Instruction):
     def parse(self, cg):
@@ -254,6 +262,20 @@ class IBranch(Instruction):
         pass
 
 
+class ICmp(Instruction):
+    def parse(self, cg):
+        cg.write(Opcode.CMP.value)
+
+        src_reg: str = cg.eat(TokenType.IDENTIFIER).as_str
+
+        cg.eat(TokenType.COMMA)
+        # write our register value
+        dest_reg: str = cg.eat(TokenType.IDENTIFIER).as_str
+        cg.write_reg(Register.get(src_reg), Register.get(dest_reg))
+
+        pass
+
+
 class ICmpi(Instruction):
     def parse(self, cg):
         cg.write(Opcode.CMPI.value)
@@ -291,10 +313,12 @@ class IBitwiseI(Instruction):
 
 class CodeGen:
     instructions = [
+        IPush('push'),
         IPushi('pushi'),
         IPop('pop'),
         IAddi('addi'),
         ISys('sys'),
+        ICmp('cmp'),
         ICmpi('cmpi'),
         IBranch('b', IBranch.DIRECT),
         IBranch('blt', IBranch.LESS_THAN),
@@ -409,7 +433,7 @@ def main():
 
     cg = CodeGen(lexer.tokens)
     cg.gen()
-    # print(f'generated code: {cg.source}')
+    print(f'generated code: {cg.source}')
 
     cg.save('demos/print/helloworld.bin')
 
