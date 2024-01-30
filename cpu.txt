@@ -8,7 +8,9 @@ bp -> base pointer (start of the program)
 pc -> program counter. current location in program.
 
 === SYSCALLS ===
-0 - stop execution
+0x00 - stop execution
+0x01 - print first byte of x0 register as character
+0x02 - toggle step debug (register dump on every step)
 
 === INSTRUCTIONS ===
 

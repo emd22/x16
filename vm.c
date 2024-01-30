@@ -3,7 +3,8 @@
 #include <string.h>
 #include <stdint.h>
 
-#define VM_FLAG_HALT 0x01
+#define VM_FLAG_HALT  0x01
+#define VM_FLAG_STEP_DEBUG 0x02
 
 #define VM_FLAG_LESS_THAN 0x40
 #define VM_FLAG_GREATER_THAN 0x80
@@ -157,6 +158,12 @@ void vm_op_sys(vm_t *vm) {
         case 0x00:
             vm->flags |= VM_FLAG_HALT;
             break;
+        case 0x01:
+            printf("%c", vm->regs.x0 & 0xFF);
+            break;
+        case 0x02:
+            vm->flags ^= VM_FLAG_STEP_DEBUG;
+            break;
         default:;
     }
 }
@@ -228,7 +235,9 @@ void vm_print_debug(vm_t *vm) {
 }
 
 void vm_step(vm_t *vm) {
-    vm_print_debug(vm);
+    if (vm->flags == VM_FLAG_STEP_DEBUG) {
+        vm_print_debug(vm);
+    }
 
     uint8_t opcode = vm_fetch8(vm);
 
