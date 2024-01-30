@@ -1,0 +1,8 @@
+; setting x0 to 10
+pushi 10
+pop x0
+addi 10, x0
+
+; halt the vm
+sys 0
+
