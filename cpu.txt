@@ -18,3 +18,6 @@ pop [reg]               -> pop a value off the stack into a register
 addi [imm] [reg]        -> add an immediate value to a register
 add [reg] [reg]         -> add a register to a register
 sys [imm8]              -> send a syscall to the cpu
+b [label]               -> immediately branch to a label
+cmpi [imm] [reg]        -> compare the value of a register to an immediate value
+

@@ -166,6 +166,7 @@ class Opcode(IntEnum):
     BASE_ADD = 0x03
     SYS = 0x04
     BASE_BRANCH = 0x05
+    BASE_COMPARE = 0x06
 
     PUSH = (BASE_PUSH << 4 | 0x00)
     PUSHI = (BASE_PUSH << 4 | 0x01)
@@ -175,6 +176,9 @@ class Opcode(IntEnum):
     ADDI = (BASE_ADD << 4 | 0x01)
 
     BRANCH = (BASE_BRANCH << 4 | 0x00)
+
+    CMP  = ((BASE_COMPARE << 4) | 0x00)
+    CMPI = ((BASE_COMPARE << 4) | 0x01)
 
 
 class IPushi(Instruction):
@@ -228,6 +232,18 @@ class IBranch(Instruction):
         pass
 
 
+class ICmpi(Instruction):
+    def parse(self, cg):
+        cg.write(Opcode.CMPI.value)
+
+        value: int = cg.eat(TokenType.NUMBER).as_int
+        cg.write16(value)
+
+        cg.eat(TokenType.COMMA)
+        # write our register value
+        reg_ident: str = cg.eat(TokenType.IDENTIFIER).as_str
+        cg.write_reg(Register.NONE.value, Register.get(reg_ident))
+        pass
 
 
 class CodeGen:
@@ -237,6 +253,7 @@ class CodeGen:
         IAddi('addi'),
         ISys('sys'),
         IBranch('b'),
+        ICmpi('cmpi'),
     ]
 
     def __init__(self, tokens):

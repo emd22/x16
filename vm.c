@@ -5,11 +5,15 @@
 
 #define VM_FLAG_HALT 0x01
 
+#define VM_FLAG_LESS_THAN 0x40
+#define VM_FLAG_GREATER_THAN 0x80
+
 #define OP_BASE_PUSH 1
 #define OP_BASE_POP  2
 #define OP_BASE_ADD  3
 #define OP_SYS       4
 #define OP_BASE_BRANCH 5
+#define OP_BASE_COMPARE 6
 
 #define OP_NOP   (0x00)
 
@@ -23,6 +27,15 @@
 
 #define OP_BRANCH ((OP_BASE_BRANCH << 4) | 0x00)
 
+#define OP_CMP    ((OP_BASE_COMPARE << 4) | 0x00)
+#define OP_CMPI   ((OP_BASE_COMPARE << 4) | 0x01)
+
+#define VM_GREATER_THAN(vm) (vm->flags & VM_FLAG_GREATER_THAN)
+#define VM_LESS_THAN(vm) (vm->flags & VM_FLAG_LESS_THAN)
+#define VM_NOT_EQUAL(vm) (VM_GREATER_THAN(vm) || VM_LESS_THAN(vm))
+#define VM_EQUAL(vm) (!VM_NOT_EQUAL(vm))
+
+#define VM_RESET_CMP_FLAGS(vm) (vm->flags &= ~(VM_FLAG_GREATER_THAN | VM_FLAG_LESS_THAN))
 
 typedef uint16_t vm_register_t;
 
@@ -138,20 +151,48 @@ void vm_op_sys(vm_t *vm) {
 
 void vm_op_branch(vm_t *vm) {
     uint16_t location = vm_fetch16(vm);
+    // jump to new location
     vm->regs.pc = location;
+
+    // reset compare flags
+    VM_RESET_CMP_FLAGS(vm);
+}
+
+void vm_op_cmpi(vm_t *vm) {
+    uint16_t imm = vm_fetch16(vm);
+
+    int ri = vm_fetch8(vm) & 0x0F;
+
+    uint16_t *reg = vm_register_from_index(vm, ri);
+    if (reg == NULL) {
+        printf("Invalid register %d\n", ri);
+        return;
+    }
+
+    VM_RESET_CMP_FLAGS(vm);
+
+    int cmp_value = ((int)(*reg)) - imm;
+
+    if (cmp_value < 0) {
+        vm->flags |= VM_FLAG_LESS_THAN;
+    }
+    else if (cmp_value > 0) {
+        vm->flags |= VM_FLAG_GREATER_THAN;
+    }
 }
 
 void vm_print_debug(vm_t *vm) {
     printf(
             "[ x0: 0x%02X x1: 0x%02X x2: 0x%02X x3: 0x%02X "
-            ":: sp: 0x%02X bp: 0x%02X pc: 0x%02X]\n",
+            ":: sp: 0x%02X bp: 0x%02X pc: 0x%02X] || fl:0x%02X\n",
             vm->regs.x0,
             vm->regs.x1,
             vm->regs.x2,
             vm->regs.x3,
             vm->regs.sp,
             vm->regs.bp,
-            vm->regs.pc
+            vm->regs.pc,
+            vm->flags
     );
 }
 
@@ -185,6 +226,10 @@ void vm_step(vm_t *vm) {
 
         case OP_BRANCH:
             vm_op_branch(vm);
+            break;
+
+        case OP_CMPI:
+            vm_op_cmpi(vm);
             break;
 
         default:
