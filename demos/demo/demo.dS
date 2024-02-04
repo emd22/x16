@@ -1,19 +1,23 @@
-b _begin
+sys 2
 
-.str "test"
+{# sub 2
+    not #1
+    addi 1, #1
+    add #1, #0
+#}
 
-_begin:
-
-push sp
-pop x3
-
-pushi 5
-pop sp
-
+pushi 10
 pop x0
-sys 1
+pushi 5
+pop x1
 
-push x3
-pop sp
+;not x1
+;addi 1, x1
+;add x1, x0
 
-sys     0
+sub x0, x1
+
+sys 0
+
+
+

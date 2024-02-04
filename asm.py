@@ -39,7 +39,7 @@ class Token:
 
 class Lexer:
     def __init__(self, buffer):
-        self.splits = ",+-*/=(){};"
+        self.splits = ",+-*/=();"
         self.ws = " \t\n\0"
         self.buffer = buffer
         self.tokens = []
@@ -88,7 +88,7 @@ class Lexer:
 
     def ttoken(self, token: Token) -> Token:
         data = token.data
-        symbols = '%#'
+        symbols = '%'
         if data == '+':
             token.type = TokenType.OP_PLUS
         elif data == ',':
@@ -125,6 +125,86 @@ class Lexer:
     def print(self):
         for token in self.tokens:
             print("Token '{}' :: {}".format(token.data, token.type))
+
+
+class Macro:
+    def __init__(self, name, arguments):
+        self.name: str = name
+        self.tokens: [Token] = []
+        self.arguments: int = arguments
+
+    def call_macro(self, main_tokens: [Token], arguments, token_index: int) -> [Token]:
+        tokens_to_remove: int = 1 + len(arguments) + len(arguments) - 1
+
+        for i in range(0, tokens_to_remove):
+            main_tokens.pop(token_index)
+
+        for idx, token in enumerate(self.tokens):
+            if token.data[0] == '#':
+                arg_index: int = int(token.data[1:])
+                token = arguments[arg_index]
+
+            main_tokens.insert(token_index + idx, token)
+
+        return main_tokens
+
+
+class Preproc:
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.index = 0
+        self.macros: [Macro] = []
+
+
+    @property
+    def next(self):
+        token = self.tokens[self.index]
+        self.index += 1
+        return token
+
+    @property
+    def has_next(self) -> bool:
+        return not self.index >= len(self.tokens)
+
+    def eat(self, expected_type: TokenType):
+        token: Token = self.next
+        if token.type != expected_type:
+            print(f'Error! unexpected token type {token.type} when expected {expected_type}')
+            exit(1)
+        return token
+
+    def process_token(self):
+        current_index = self.index
+        token = self.next
+
+        if token.data == '{#':
+            name: str = self.eat(TokenType.IDENTIFIER).as_str
+
+            args = self.eat(TokenType.NUMBER).as_int
+
+            macro: Macro = Macro(name, args)
+
+            while self.has_next:
+                token: Token = self.next
+
+                if token.type == TokenType.IDENTIFIER and token.as_str == '#}':
+                    break
+
+                macro.tokens.append(token)
+
+            del self.tokens[current_index:self.index]
+
+            self.macros.append(macro)
+
+    def find_macro(self, name: str) -> Macro or None:
+        for macro in self.macros:
+            if macro.name == name:
+                return macro
+        return None
+
+    def run(self):
+        while self.has_next:
+            self.process_token()
 
 
 class Instruction:
@@ -172,6 +252,7 @@ class Opcode(IntEnum):
     BASE_COMPARE = 0x06
     BASE_AND = 0x07
     BASE_OR = 0x08
+    BASE_NOT = 0x09
 
     PUSH = (BASE_PUSH << 4 | 0x00)
     PUSHI = (BASE_PUSH << 4 | 0x01)
@@ -191,6 +272,8 @@ class Opcode(IntEnum):
 
     ANDI = ((BASE_AND << 4) | 0x01)
     ORI = ((BASE_OR << 4) | 0x01)
+
+    NOT = ((BASE_NOT << 4) | 0x00)
 
 class IPush(Instruction):
     def parse(self, cg):
@@ -217,17 +300,38 @@ class IPop(Instruction):
         cg.write_reg(Register.NONE.value, Register.get(reg_ident))
 
 
-class IAddi(Instruction):
-    def parse(self, cg):
-        cg.write(Opcode.ADDI.value)
+class IAdd(Instruction):
+    ADD = Opcode.ADD.value
+    ADDI = Opcode.ADDI.value
+
+    def __init__(self, ident, operation):
+        super().__init__(ident)
+        self.operation = operation
+
+    def parse_immediate(self, cg):
         # write our immediate value
         value: int = cg.eat(TokenType.NUMBER).as_int
         cg.write16(value)
-
         cg.eat(TokenType.COMMA)
         # write our register value
         reg_ident: str = cg.eat(TokenType.IDENTIFIER).as_str
         cg.write_reg(Register.NONE.value, Register.get(reg_ident))
+
+
+    def parse_register(self, cg):
+        src_ident: str = cg.eat(TokenType.IDENTIFIER).as_str
+        cg.eat(TokenType.COMMA)
+        # write our register value
+        dest_ident: str = cg.eat(TokenType.IDENTIFIER).as_str
+        cg.write_reg(Register.get(src_ident), Register.get(dest_ident))
+
+    def parse(self, cg):
+        cg.write(self.operation)
+
+        if self.operation == self.ADDI:
+            self.parse_immediate(cg)
+        else:
+            self.parse_register(cg)
 
 
 class ISys(Instruction):
@@ -290,6 +394,14 @@ class ICmpi(Instruction):
         pass
 
 
+class INot(Instruction):
+    def parse(self, cg):
+        cg.write(Opcode.NOT.value)
+        reg_ident = cg.eat(TokenType.IDENTIFIER).as_str
+        # write only our destination register
+        cg.write_reg(Register.NONE.value, Register.get(reg_ident))
+
+
 class IBitwiseI(Instruction):
     AND = Opcode.ANDI.value
     OR = Opcode.ORI.value
@@ -316,7 +428,8 @@ class CodeGen:
         IPush('push'),
         IPushi('pushi'),
         IPop('pop'),
-        IAddi('addi'),
+        IAdd('add', IAdd.ADD),
+        IAdd('addi', IAdd.ADDI),
         ISys('sys'),
         ICmp('cmp'),
         ICmpi('cmpi'),
@@ -327,10 +440,13 @@ class CodeGen:
         IBranch('bne', IBranch.NOT_EQUAL_TO),
         IBitwiseI('andi', IBitwiseI.AND),
         IBitwiseI('ori', IBitwiseI.OR),
+        INot('not'),
     ]
 
-    def __init__(self, tokens):
+    def __init__(self, tokens, preproc: Preproc):
         self.tokens = tokens
+        self.preproc = preproc
+
         self.index = 0
         self.source = []
         self.labels: [Label] = []
@@ -378,6 +494,7 @@ class CodeGen:
             # append the null terminator
             self.source.append(0)
 
+
     def parse_label(self, ident):
         label = Label(ident.as_str[:-1], len(self.source))
         self.labels.append(label)
@@ -397,6 +514,22 @@ class CodeGen:
             if op.ident == ident.data:
                 op.parse(self)
                 return
+
+        macro: Macro or None = self.preproc.find_macro(ident.as_str)
+        if macro is not None:
+            token_index: int = self.index
+            arguments = []
+
+            for i in range(0, macro.arguments):
+                arguments.append(self.next)
+                if i < macro.arguments - 1:
+                    self.eat(TokenType.COMMA)
+
+            self.tokens = macro.call_macro(self.tokens, arguments, token_index - 1)
+            self.index = token_index - 1
+
+            self.parse_instr()
+            return
 
         print(f'Could not find instruction "{ident.as_str}"!')
         exit(1)
@@ -424,18 +557,22 @@ class CodeGen:
 
 
 def main():
-    source_file = open('demos/print/helloworld.dS', 'r')
+    source_file = open('demos/demo/demo.dS', 'r')
     lexer = Lexer(source_file.read())
     lexer.lex()
+
+    preproc = Preproc(lexer.tokens)
+    preproc.run()
 
     # print('Tokens:')
     # lexer.print()
 
-    cg = CodeGen(lexer.tokens)
+    cg = CodeGen(preproc.tokens, preproc)
     cg.gen()
+    # print(cg.tokens)
     print(f'generated code: {cg.source}')
 
-    cg.save('demos/print/helloworld.bin')
+    cg.save('demos/demo/demo.bin')
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@
 #define OP_BASE_COMPARE 6
 #define OP_BASE_AND     7
 #define OP_BASE_OR      8
+#define OP_BASE_NOT     9
 
 #define OP_NOP   (0x00)
 
@@ -39,6 +40,8 @@
 
 #define OP_ANDI   ((OP_BASE_AND << 4) | 0x01)
 #define OP_ORI    ((OP_BASE_OR << 4) | 0x01)
+
+#define OP_NOT    ((OP_BASE_NOT << 4) | 0x00)
 
 #define VM_GREATER_THAN(vm) (vm->flags & VM_FLAG_GREATER_THAN)
 #define VM_LESS_THAN(vm) (vm->flags & VM_FLAG_LESS_THAN)
@@ -146,7 +149,6 @@ void vm_op_push(vm_t *vm) {
     }
     uint16_t value = *reg;
 
-
     vm->memory[vm->regs.sp++] = (value >> 8) & 0xFF;
     vm->memory[vm->regs.sp++] = value & 0xFF;
 
@@ -171,6 +173,22 @@ void vm_op_pop(vm_t *vm) {
 
 //    vm_print_stack(vm);
 
+}
+
+void vm_op_add(vm_t *vm) {
+    int registers = vm_fetch8(vm);
+
+    uint8_t srci = registers >> 4;
+    uint8_t desti = registers & 0x0F;
+
+    uint16_t *reg_src = vm_register_from_index(vm, srci);
+    uint16_t *reg_dest = vm_register_from_index(vm, desti);
+    if (reg_src == NULL || reg_dest == NULL) {
+        printf("Invalid register(s) %d, %d\n", srci, desti);
+        return;
+    }
+
+    (*reg_dest) += (*reg_src);
 }
 
 void vm_op_addi(vm_t *vm) {
@@ -299,6 +317,18 @@ void vm_op_bitwisei(vm_t *vm, vm_bitwise_type_t type) {
     }
 }
 
+void vm_op_not(vm_t *vm) {
+    int ri = vm_fetch8(vm) & 0x0F;
+
+    uint16_t *reg = vm_register_from_index(vm, ri);
+    if (reg == NULL) {
+        printf("Invalid register %d\n", ri);
+        return;
+    }
+
+    (*reg) = ~(*reg);
+}
+
 void vm_print_debug(vm_t *vm) {
     printf(
             "[ x0: 0x%04X x1: 0x%04X x2: 0x%04X x3: 0x%04X "
@@ -335,6 +365,10 @@ void vm_step(vm_t *vm) {
 
         case OP_POP:
             vm_op_pop(vm);
+            break;
+
+        case OP_ADD:
+            vm_op_add(vm);
             break;
 
         case OP_ADDI:
@@ -375,6 +409,10 @@ void vm_step(vm_t *vm) {
 
         case OP_ORI:
             vm_op_bitwisei(vm, VM_BITWISE_TYPE_OR);
+            break;
+
+        case OP_NOT:
+            vm_op_not(vm);
             break;
 
         default:
@@ -423,7 +461,7 @@ int main(int argc, char *argv[]) {
     vm.regs.sp = 0x5000;
 
     uint16_t program_size;
-    uint8_t *program = load_program("demos/print/helloworld.bin", &program_size);
+    uint8_t *program = load_program("demos/demo/demo.bin", &program_size);
     // load our program into the vm
     vm_load_program(&vm, 0x00, program, program_size);
 
