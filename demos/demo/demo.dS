@@ -1,23 +1,14 @@
-sys 2
+.include "demos/_std.dS"
 
-{# sub 2
-    not #1
-    addi 1, #1
-    add #1, #0
-#}
+
+sys 2
 
 pushi 10
 pop x0
 pushi 5
 pop x1
 
-;not x1
-;addi 1, x1
-;add x1, x0
-
 sub x0, x1
 
 sys 0
-
-
 

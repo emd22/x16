@@ -493,6 +493,12 @@ class CodeGen:
                 self.source.append(ord(ch))
             # append the null terminator
             self.source.append(0)
+        elif ident_str == '.include':
+            path = self.eat(TokenType.STRING).as_str[1:-1]
+            other_cg = process_source_file(path)
+            self.preproc.macros.extend(other_cg.preproc.macros)
+            self.tokens[self.index:self.index] = other_cg.tokens
+
 
 
     def parse_label(self, ident):
@@ -556,23 +562,27 @@ class CodeGen:
         output_file.close()
 
 
-def main():
-    source_file = open('demos/demo/demo.dS', 'r')
+def process_source_file(path: str) -> CodeGen:
+    source_file = open(path, 'r')
     lexer = Lexer(source_file.read())
     lexer.lex()
 
     preproc = Preproc(lexer.tokens)
     preproc.run()
 
-    # print('Tokens:')
-    # lexer.print()
-
     cg = CodeGen(preproc.tokens, preproc)
     cg.gen()
-    # print(cg.tokens)
+
+    return cg
+
+
+def main():
+    path = 'demos/demo/demo'
+    cg: CodeGen = process_source_file(path + '.dS')
+
     print(f'generated code: {cg.source}')
 
-    cg.save('demos/demo/demo.bin')
+    cg.save(path + '.bin')
 
 
 if __name__ == "__main__":
