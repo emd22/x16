@@ -3,3 +3,9 @@
     addi 1, #1
     add #1, #0
 #}
+
+{# movi 2
+    pushi #0
+    pop #1
+#}
+

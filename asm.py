@@ -179,7 +179,6 @@ class Preproc:
 
         if token.data == '{#':
             name: str = self.eat(TokenType.IDENTIFIER).as_str
-
             args = self.eat(TokenType.NUMBER).as_int
 
             macro: Macro = Macro(name, args)
@@ -193,6 +192,7 @@ class Preproc:
                 macro.tokens.append(token)
 
             del self.tokens[current_index:self.index]
+            self.index = current_index
 
             self.macros.append(macro)
 
@@ -443,9 +443,11 @@ class CodeGen:
         INot('not'),
     ]
 
-    def __init__(self, tokens, preproc: Preproc):
+    def __init__(self, tokens, preproc: Preproc, path):
         self.tokens = tokens
         self.preproc = preproc
+
+        self.path = path
 
         self.index = 0
         self.source = []
@@ -465,7 +467,7 @@ class CodeGen:
     def eat(self, expected_type: TokenType):
         token: Token = self.next
         if token.type != expected_type:
-            print(f'Error! unexpected token type {token.type} when expected {expected_type}')
+            print(f'{self.path}: Error! unexpected token type {token.type} when expected {expected_type}')
             exit(1)
         return token
 
@@ -483,6 +485,12 @@ class CodeGen:
             self.source[label.location + 1] = value & 0xFF
         pass
 
+
+    def include_file(self, path):
+        other_cg = process_source_file(path)
+        self.preproc.macros.extend(other_cg.preproc.macros)
+        self.tokens[self.index:self.index] = other_cg.tokens
+
     def parse_preproc(self, ident):
         ident_str = ident.as_str
         if ident_str == '.str':
@@ -495,11 +503,7 @@ class CodeGen:
             self.source.append(0)
         elif ident_str == '.include':
             path = self.eat(TokenType.STRING).as_str[1:-1]
-            other_cg = process_source_file(path)
-            self.preproc.macros.extend(other_cg.preproc.macros)
-            self.tokens[self.index:self.index] = other_cg.tokens
-
-
+            self.include_file(path)
 
     def parse_label(self, ident):
         label = Label(ident.as_str[:-1], len(self.source))
@@ -537,7 +541,7 @@ class CodeGen:
             self.parse_instr()
             return
 
-        print(f'Could not find instruction "{ident.as_str}"!')
+        print(f'{self.path}: Error! Could not find instruction "{ident.as_str}"!')
         exit(1)
 
     def gen(self):
@@ -570,7 +574,7 @@ def process_source_file(path: str) -> CodeGen:
     preproc = Preproc(lexer.tokens)
     preproc.run()
 
-    cg = CodeGen(preproc.tokens, preproc)
+    cg = CodeGen(preproc.tokens, preproc, path)
     cg.gen()
 
     return cg

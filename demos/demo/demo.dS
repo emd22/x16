@@ -3,12 +3,7 @@
 
 sys 2
 
-pushi 10
-pop x0
-pushi 5
-pop x1
-
-sub x0, x1
+movi 10, x0
 
 sys 0
 
