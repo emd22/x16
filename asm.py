@@ -1,5 +1,5 @@
 from enum import Enum, IntEnum
-
+import typing
 
 class TokenType(Enum):
     NONE = -1
@@ -116,7 +116,7 @@ class Lexer:
         elif data in symbols:
             token.type = TokenType.SYMBOL
         elif data[0] == '0' and data[1] == 'x' and len(data) > 2:
-            token.data = int(token.data, 16)
+            token.data = str(int(token.data, 16)) # hack! convert our base 16 integer into a base 10 integer
             token.type = TokenType.NUMBER
         else:
             token.type = TokenType.IDENTIFIER
@@ -130,10 +130,10 @@ class Lexer:
 class Macro:
     def __init__(self, name, arguments):
         self.name: str = name
-        self.tokens: [Token] = []
+        self.tokens: list[Token] = []
         self.arguments: int = arguments
 
-    def call_macro(self, main_tokens: [Token], arguments, token_index: int) -> [Token]:
+    def call_macro(self, main_tokens: list[Token], arguments, token_index: int) -> list[Token]:
         tokens_to_remove: int = 1 + len(arguments) + len(arguments) - 1
 
         for i in range(0, tokens_to_remove):
@@ -153,7 +153,7 @@ class Preproc:
     def __init__(self, tokens):
         self.tokens = tokens
         self.index = 0
-        self.macros: [Macro] = []
+        self.macros: list[Macro] = []
 
 
     @property
@@ -196,7 +196,7 @@ class Preproc:
 
             self.macros.append(macro)
 
-    def find_macro(self, name: str) -> Macro or None:
+    def find_macro(self, name: str) -> typing.Optional[Macro]:
         for macro in self.macros:
             if macro.name == name:
                 return macro
@@ -205,15 +205,6 @@ class Preproc:
     def run(self):
         while self.has_next:
             self.process_token()
-
-
-class Instruction:
-    def __init__(self, ident: str):
-        self.ident = ident
-
-    def parse(self, codegen):
-        pass
-
 
 class Register(IntEnum):
 
@@ -226,6 +217,7 @@ class Register(IntEnum):
     BP = 6
     PC = 7
 
+    @staticmethod
     def get(ident: str) -> int:
         regmap = ['none', 'x0', 'x1', 'x2', 'x3', 'sp', 'bp', 'pc']
 
@@ -274,6 +266,13 @@ class Opcode(IntEnum):
     ORI = ((BASE_OR << 4) | 0x01)
 
     NOT = ((BASE_NOT << 4) | 0x00)
+
+class Instruction:
+    def __init__(self, ident: str):
+        self.ident = ident
+
+    def parse(self, cg):
+        pass
 
 class IPush(Instruction):
     def parse(self, cg):
@@ -451,8 +450,8 @@ class CodeGen:
 
         self.index = 0
         self.source = []
-        self.labels: [Label] = []
-        self.labels_to_update: [Label] = []
+        self.labels: list[Label] = []
+        self.labels_to_update: list[Label] = []
 
     @property
     def next(self):
@@ -525,7 +524,7 @@ class CodeGen:
                 op.parse(self)
                 return
 
-        macro: Macro or None = self.preproc.find_macro(ident.as_str)
+        macro: typing.Optional[Macro] = self.preproc.find_macro(ident.as_str)
         if macro is not None:
             token_index: int = self.index
             arguments = []

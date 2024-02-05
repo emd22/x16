@@ -5,7 +5,48 @@
 #}
 
 {# movi 2
-    pushi #0
-    pop #1
+    pushi #0 pop #1
+#}
+{# mov 2
+    push #0 pop #1
 #}
 
+{# __save_stack__ 1
+    push #0
+    mov sp, #0
+#}
+{# __load_stack__ 1
+    mov #0, sp
+    pop #0
+#}
+
+; get a byte in memory
+; __getmem__ [ptr], [dest reg]
+
+{# __getmem__ 2
+    __save_stack__ x3
+
+    movi #0, sp
+    pop #1
+
+    __load_stack__ x3
+#}
+
+{# while 1
+    mov #0, x3
+    cmpi 0, x3
+    be __ENDLOOP__
+    __STARTLOOP__:
+#}
+{# continue 1
+    addi 65535, x3
+    b __STARTLOOP__:
+    __ENDLOOP__:
+#}
+
+b __end_definitions__
+halt:
+    sys 0
+
+
+__end_definitions__:

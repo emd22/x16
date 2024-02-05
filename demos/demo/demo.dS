@@ -1,9 +1,17 @@
+b _start
+.str "Hello"
+
+_start:
+
 .include "demos/_std.dS"
 
+movi 65, x0
+movi 5, x1
 
 sys 2
+while x1
+    ;sys 1
+    continue x1
 
-movi 10, x0
-
-sys 0
+b halt
 
