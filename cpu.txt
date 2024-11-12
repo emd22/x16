@@ -11,6 +11,10 @@ pc -> program counter. current location in program.
 0x00 - stop execution
 0x01 - print first byte of x0 register as character
 0x02 - toggle step debug (register dump on every step)
+0x03 - load binary from disk
+    Input:
+        x0 -> memory address to load into
+        x1 -> pointer to path of bin file
 
 === INSTRUCTIONS ===
 
@@ -19,10 +23,13 @@ push [reg]              -> push a register to the stack. always 16 bit
 pop [reg]               -> pop a value off the stack into a register
 addi [imm] [reg]        -> add an immediate value to a register
 add [reg] [reg]         -> add a register to a register
+
 sys [imm8]              -> send a syscall to the cpu
+
 cmp [reg] [reg]         -> compare two register values
 cmpi [imm] [reg]        -> compare the value of a register to an immediate value
 
+not [reg]               -> bitwise negate a register
 andi [imm] [reg]        -> bitwise AND a register with an immediate value
 ori  [imm] [reg]        -> bitwise OR a register with an immediate value
 
@@ -31,3 +38,37 @@ blt [label]             -> branch to a label if a comparison result is a negativ
 bgt [label]             -> branch to a label if a comparison result is a positive number
 be [label]              -> branch to a label if a comparison result is zero
 bne [label]             -> branch to a label if a comparison result is non-zero
+
+=== DIRECTIVES ===
+
+.str [string]           -> encode data into the executable
+
+=== MACROS ===
+
+{# [macro_name] [number of arguments]
+    ; instructions here ...
+
+    [instruction] #[index of argument]
+    ; push #0
+    ; or
+    ; pop #1
+#}
+
+for example,
+
+; exchange the values between two registers
+{# xchg 2
+    push #0
+    mov #1, #0
+    pop #1
+#}
+
+would be used like:
+
+xchg x1, x2
+
+and would result in the code generated as
+
+push x1
+mov x2, x1
+pop x2
