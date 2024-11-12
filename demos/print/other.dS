@@ -1,0 +1,21 @@
+sys     2 ; set debug mode
+
+addi    0x500, x0 ; set the memory pointer argument
+
+pushi   file_path ; set our file path to load
+pop     x1
+
+sys     3         ; load the new binary
+
+; set our base pointer to adjust to the new loaded section
+addi    0x500, bp
+
+; jump to the pointer
+pushi   0x500
+pop     pc
+
+; we should never return, but this is just good practice.
+sys     0
+
+file_path:
+    .str "demos/print/helloworld.bin"

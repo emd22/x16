@@ -1,7 +1,7 @@
 {# sub 2
-    not #1
-    addi 1, #1
-    add #1, #0
+    not #0
+    addi 1, #0
+    add #0, #1
 #}
 
 {# movi 2
@@ -44,9 +44,16 @@
     __ENDLOOP__:
 #}
 
+
+
+
+
 b __end_definitions__
 halt:
     sys 0
+
+
+
 
 
 __end_definitions__:

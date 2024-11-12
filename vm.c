@@ -1,54 +1,57 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 
-#define VM_FLAG_HALT  0x01
+#include <unistd.h>
+
+#define VM_FLAG_HALT 0x01
 #define VM_FLAG_STEP_DEBUG 0x02
 
 #define VM_FLAG_LESS_THAN 0x40
 #define VM_FLAG_GREATER_THAN 0x80
 
-#define OP_BASE_PUSH    1
-#define OP_BASE_POP     2
-#define OP_BASE_ADD     3
-#define OP_SYS          4
-#define OP_BASE_BRANCH  5
+#define OP_BASE_PUSH 1
+#define OP_BASE_POP 2
+#define OP_BASE_ADD 3
+#define OP_SYS 4
+#define OP_BASE_BRANCH 5
 #define OP_BASE_COMPARE 6
-#define OP_BASE_AND     7
-#define OP_BASE_OR      8
-#define OP_BASE_NOT     9
+#define OP_BASE_AND 7
+#define OP_BASE_OR 8
+#define OP_BASE_NOT 9
 
-#define OP_NOP   (0x00)
+#define OP_NOP (0x00)
 
-#define OP_PUSH  ((OP_BASE_PUSH << 4) | 0x00)
+#define OP_PUSH ((OP_BASE_PUSH << 4) | 0x00)
 #define OP_PUSHI ((OP_BASE_PUSH << 4) | 0x01)
 
-#define OP_POP   ((OP_BASE_POP << 4)  | 0x00)
+#define OP_POP ((OP_BASE_POP << 4) | 0x00)
 
-#define OP_ADD   ((OP_BASE_ADD << 4)  | 0x00)
-#define OP_ADDI  ((OP_BASE_ADD << 4)  | 0x01)
+#define OP_ADD ((OP_BASE_ADD << 4) | 0x00)
+#define OP_ADDI ((OP_BASE_ADD << 4) | 0x01)
 
-#define OP_BRANCH               ((OP_BASE_BRANCH << 4) | 0x00)
-#define OP_BRANCH_LESS_THAN     ((OP_BASE_BRANCH << 4) | 0x01)
-#define OP_BRANCH_GREATER_THAN  ((OP_BASE_BRANCH << 4) | 0x02)
-#define OP_BRANCH_EQUAL_TO      ((OP_BASE_BRANCH << 4) | 0x03)
-#define OP_BRANCH_NOT_EQUAL_TO  ((OP_BASE_BRANCH << 4) | 0x04)
+#define OP_BRANCH ((OP_BASE_BRANCH << 4) | 0x00)
+#define OP_BRANCH_LESS_THAN ((OP_BASE_BRANCH << 4) | 0x01)
+#define OP_BRANCH_GREATER_THAN ((OP_BASE_BRANCH << 4) | 0x02)
+#define OP_BRANCH_EQUAL_TO ((OP_BASE_BRANCH << 4) | 0x03)
+#define OP_BRANCH_NOT_EQUAL_TO ((OP_BASE_BRANCH << 4) | 0x04)
 
-#define OP_CMP    ((OP_BASE_COMPARE << 4) | 0x00)
-#define OP_CMPI   ((OP_BASE_COMPARE << 4) | 0x01)
+#define OP_CMP ((OP_BASE_COMPARE << 4) | 0x00)
+#define OP_CMPI ((OP_BASE_COMPARE << 4) | 0x01)
 
-#define OP_ANDI   ((OP_BASE_AND << 4) | 0x01)
-#define OP_ORI    ((OP_BASE_OR << 4) | 0x01)
+#define OP_ANDI ((OP_BASE_AND << 4) | 0x01)
+#define OP_ORI ((OP_BASE_OR << 4) | 0x01)
 
-#define OP_NOT    ((OP_BASE_NOT << 4) | 0x00)
+#define OP_NOT ((OP_BASE_NOT << 4) | 0x00)
 
 #define VM_GREATER_THAN(vm) (vm->flags & VM_FLAG_GREATER_THAN)
 #define VM_LESS_THAN(vm) (vm->flags & VM_FLAG_LESS_THAN)
 #define VM_NOT_EQUAL(vm) (VM_GREATER_THAN(vm) || VM_LESS_THAN(vm))
 #define VM_EQUAL(vm) (!VM_NOT_EQUAL(vm))
 
-#define VM_RESET_CMP_FLAGS(vm) (vm->flags &= ~(VM_FLAG_GREATER_THAN | VM_FLAG_LESS_THAN))
+#define VM_RESET_CMP_FLAGS(vm)                                                 \
+  (vm->flags &= ~(VM_FLAG_GREATER_THAN | VM_FLAG_LESS_THAN))
 
 typedef uint16_t vm_register_t;
 
@@ -62,6 +65,8 @@ typedef struct {
     uint16_t memory_size;
     vm_register_file_t regs;
     uint8_t flags;
+
+    uint16_t step_delay_ms;
 } vm_t;
 
 typedef enum {
@@ -73,57 +78,55 @@ typedef enum {
 } vm_branch_mode_t;
 
 typedef enum {
-    VM_BITWISE_TYPE_AND = 0,
-    VM_BITWISE_TYPE_OR  = 1,
+  VM_BITWISE_TYPE_AND = 0,
+  VM_BITWISE_TYPE_OR = 1,
 } vm_bitwise_type_t;
 
 vm_t vm_new(uint16_t memory_size) {
-    vm_t vm;
-    memset(&vm, 0, sizeof(vm_t));
+  vm_t vm;
+  memset(&vm, 0, sizeof(vm_t));
 
-    vm.memory_size = memory_size;
-    vm.memory = calloc(1, memory_size);
+  vm.memory_size = memory_size;
+  vm.memory = calloc(1, memory_size);
+  vm.step_delay_ms = 0;
 
-    return vm;
+  return vm;
 }
 
 uint16_t *vm_register_from_index(vm_t *vm, int index) {
     switch (index) {
-        case 0:
-            return NULL;
-        case 1:
-            return &vm->regs.x0;
-        case 2:
-            return &vm->regs.x1;
-        case 3:
-            return &vm->regs.x2;
-        case 4:
-            return &vm->regs.x3;
-        case 5:
-            return &vm->regs.sp;
-        case 6:
-            return &vm->regs.bp;
-        case 7:
-            return &vm->regs.pc;
-        default:;
+    case 0:
+        return NULL;
+    case 1:
+        return &vm->regs.x0;
+    case 2:
+        return &vm->regs.x1;
+    case 3:
+        return &vm->regs.x2;
+    case 4:
+        return &vm->regs.x3;
+    case 5:
+        return &vm->regs.sp;
+    case 6:
+        return &vm->regs.bp;
+    case 7:
+        return &vm->regs.pc;
+    default:;
     }
     return NULL;
 }
 
-void vm_load_program(vm_t *vm, uint16_t addr, uint8_t *program, uint16_t program_size) {
+void vm_load_program(vm_t *vm, uint16_t addr, uint8_t *program,
+                     uint16_t program_size) {
     memcpy(vm->memory + addr, program, program_size);
 }
 
-uint8_t vm_fetch8(vm_t *vm) {
-    return vm->memory[vm->regs.bp + vm->regs.pc++];
-}
+uint8_t vm_fetch8(vm_t *vm) { return vm->memory[vm->regs.pc++]; }
 
-uint16_t vm_fetch16(vm_t *vm) {
-    return ((vm_fetch8(vm) << 8) | vm_fetch8(vm));
-}
+uint16_t vm_fetch16(vm_t *vm) { return ((vm_fetch8(vm) << 8) | vm_fetch8(vm)); }
 
 uint8_t vm_pop8(vm_t *vm) {
-    uint8_t value = vm->memory[--vm->regs.sp];
+    uint8_t value = vm->memory[--vm->regs.sp + vm->regs.bp];
     return value;
 }
 
@@ -149,15 +152,15 @@ void vm_op_push(vm_t *vm) {
     }
     uint16_t value = *reg;
 
-    vm->memory[vm->regs.sp++] = (value >> 8) & 0xFF;
-    vm->memory[vm->regs.sp++] = value & 0xFF;
+    vm->memory[vm->regs.sp++  + vm->regs.bp] = (value >> 8) & 0xFF;
+    vm->memory[vm->regs.sp++  + vm->regs.bp] = value & 0xFF;
 
-//    vm_print_stack(vm);
+    //    vm_print_stack(vm);
 }
 
 void vm_op_pushi(vm_t *vm) {
-    vm->memory[vm->regs.sp++] = vm_fetch8(vm);
-    vm->memory[vm->regs.sp++] = vm_fetch8(vm);
+    vm->memory[vm->regs.sp++ + vm->regs.bp] = vm_fetch8(vm);
+    vm->memory[vm->regs.sp++ + vm->regs.bp] = vm_fetch8(vm);
 }
 
 void vm_op_pop(vm_t *vm) {
@@ -171,8 +174,7 @@ void vm_op_pop(vm_t *vm) {
 
     (*reg) = vm_pop16(vm);
 
-//    vm_print_stack(vm);
-
+    //    vm_print_stack(vm);
 }
 
 void vm_op_add(vm_t *vm) {
@@ -205,26 +207,57 @@ void vm_op_addi(vm_t *vm) {
     (*reg) += imm;
 }
 
+uint8_t *load_program(char *filename, uint16_t *size);
+void vm_load_program(vm_t *vm, uint16_t addr, uint8_t *program,
+                     uint16_t program_size);
+
+void vm_sys_load_bin(vm_t *vm) {
+    uint16_t memory_address = vm->regs.x0;
+    uint16_t path_ptr = vm->regs.x1;
+
+    // FIXME: there should be a better solution for this!
+    char *path = (char *)(&vm->memory[path_ptr]);
+    printf("loading %s\n", path);
+
+    uint16_t program_size;
+    uint8_t *program = load_program(path, &program_size);
+
+
+    vm_load_program(vm, memory_address, program, program_size);
+}
+
 void vm_op_sys(vm_t *vm) {
     const uint8_t sys = vm_fetch8(vm);
 
-    switch(sys) {
-        case 0x00:
-            vm->flags |= VM_FLAG_HALT;
-            break;
-        case 0x01:
-            printf("%c", vm->regs.x0 & 0xFF);
-            break;
-        case 0x02:
-            vm->flags ^= VM_FLAG_STEP_DEBUG;
-            break;
-        default:;
+    switch (sys) {
+    /* VM control (as of right now, halt) */
+    case 0x00:
+        vm->flags |= VM_FLAG_HALT;
+        break;
+
+    /* Display I/O */
+    case 0x01:
+        putchar(vm->regs.x0 & 0xFF);
+        fflush(stdout);
+        break;
+
+    /* Debug flags */
+    case 0x02:
+        // vm->flags ^= VM_FLAG_STEP_DEBUG;
+        break;
+
+    /* Disk I/O */
+    case 0x03:
+        vm_sys_load_bin(vm);
+        break;
+
+    default:;
     }
 }
 
 void vm_jump_to(vm_t *vm, uint16_t location) {
     // jump to new location
-    vm->regs.pc = location;
+    vm->regs.pc = location + vm->regs.bp;
 
     // reset compare flags
     VM_RESET_CMP_FLAGS(vm);
@@ -235,17 +268,13 @@ void vm_op_branch(vm_t *vm, vm_branch_mode_t mode) {
 
     if (mode == VM_BRANCH_MODE_DIRECT) {
         vm_jump_to(vm, location);
-    }
-    else if (mode == VM_BRANCH_MODE_LESS_THAN && VM_LESS_THAN(vm)) {
+    } else if (mode == VM_BRANCH_MODE_LESS_THAN && VM_LESS_THAN(vm)) {
         vm_jump_to(vm, location);
-    }
-    else if (mode == VM_BRANCH_MODE_GREATER_THAN && VM_GREATER_THAN(vm)) {
+    } else if (mode == VM_BRANCH_MODE_GREATER_THAN && VM_GREATER_THAN(vm)) {
         vm_jump_to(vm, location);
-    }
-    else if (mode == VM_BRANCH_MODE_EQUAL_TO && VM_EQUAL(vm)) {
+    } else if (mode == VM_BRANCH_MODE_EQUAL_TO && VM_EQUAL(vm)) {
         vm_jump_to(vm, location);
-    }
-    else if (mode == VM_BRANCH_MODE_NOT_EQUAL_TO && VM_NOT_EQUAL(vm)) {
+    } else if (mode == VM_BRANCH_MODE_NOT_EQUAL_TO && VM_NOT_EQUAL(vm)) {
         vm_jump_to(vm, location);
     }
 }
@@ -269,8 +298,7 @@ void vm_op_cmp(vm_t *vm) {
 
     if (cmp_value < 0) {
         vm->flags |= VM_FLAG_LESS_THAN;
-    }
-    else if (cmp_value > 0) {
+    } else if (cmp_value > 0) {
         vm->flags |= VM_FLAG_GREATER_THAN;
     }
 }
@@ -292,8 +320,7 @@ void vm_op_cmpi(vm_t *vm) {
 
     if (cmp_value < 0) {
         vm->flags |= VM_FLAG_LESS_THAN;
-    }
-    else if (cmp_value > 0) {
+    } else if (cmp_value > 0) {
         vm->flags |= VM_FLAG_GREATER_THAN;
     }
 }
@@ -311,8 +338,7 @@ void vm_op_bitwisei(vm_t *vm, vm_bitwise_type_t type) {
 
     if (type == VM_BITWISE_TYPE_AND) {
         (*reg) &= imm;
-    }
-    else if (type == VM_BITWISE_TYPE_OR) {
+    } else if (type == VM_BITWISE_TYPE_OR) {
         (*reg) |= imm;
     }
 }
@@ -330,18 +356,10 @@ void vm_op_not(vm_t *vm) {
 }
 
 void vm_print_debug(vm_t *vm) {
-    printf(
-            "[ x0: 0x%04X x1: 0x%04X x2: 0x%04X x3: 0x%04X "
-            ":: sp: 0x%04X bp: 0x%04X pc: 0x%04X] || fl:0x%02X\n",
-            vm->regs.x0,
-            vm->regs.x1,
-            vm->regs.x2,
-            vm->regs.x3,
-            vm->regs.sp,
-            vm->regs.bp,
-            vm->regs.pc,
-            vm->flags
-    );
+    printf("\t[ x0: 0x%04X x1: 0x%04X x2: 0x%04X x3: 0x%04X "
+         ":: sp: 0x%04X bp: 0x%04X pc: 0x%04X] || fl:0x%02X\n",
+         vm->regs.x0, vm->regs.x1, vm->regs.x2, vm->regs.x3, vm->regs.sp,
+         vm->regs.bp, vm->regs.pc, vm->flags);
 }
 
 void vm_step(vm_t *vm) {
@@ -351,73 +369,75 @@ void vm_step(vm_t *vm) {
 
     uint8_t opcode = vm_fetch8(vm);
 
+    usleep(vm->step_delay_ms * 1000);
+
     switch (opcode) {
-        case OP_NOP:
-            return;
+    case OP_NOP:
+        return;
 
-        case OP_PUSH:
-            vm_op_push(vm);
-            break;
+    case OP_PUSH:
+        vm_op_push(vm);
+        break;
 
-        case OP_PUSHI:
-            vm_op_pushi(vm);
-            break;
+    case OP_PUSHI:
+        vm_op_pushi(vm);
+        break;
 
-        case OP_POP:
-            vm_op_pop(vm);
-            break;
+    case OP_POP:
+        vm_op_pop(vm);
+        break;
 
-        case OP_ADD:
-            vm_op_add(vm);
-            break;
+    case OP_ADD:
+        vm_op_add(vm);
+        break;
 
-        case OP_ADDI:
-            vm_op_addi(vm);
-            break;
+    case OP_ADDI:
+        vm_op_addi(vm);
+        break;
 
-        case OP_SYS:
-            vm_op_sys(vm);
-            break;
+    case OP_SYS:
+        vm_op_sys(vm);
+        break;
 
-        case OP_BRANCH:
-            vm_op_branch(vm, VM_BRANCH_MODE_DIRECT);
-            break;
-        case OP_BRANCH_LESS_THAN:
-            vm_op_branch(vm, VM_BRANCH_MODE_LESS_THAN);
-            break;
-        case OP_BRANCH_GREATER_THAN:
-            vm_op_branch(vm, VM_BRANCH_MODE_GREATER_THAN);
-            break;
-        case OP_BRANCH_EQUAL_TO:
-            vm_op_branch(vm, VM_BRANCH_MODE_EQUAL_TO);
-            break;
-        case OP_BRANCH_NOT_EQUAL_TO:
-            vm_op_branch(vm, VM_BRANCH_MODE_NOT_EQUAL_TO);
-            break;
+    case OP_BRANCH:
+        vm_op_branch(vm, VM_BRANCH_MODE_DIRECT);
+        break;
+    case OP_BRANCH_LESS_THAN:
+        vm_op_branch(vm, VM_BRANCH_MODE_LESS_THAN);
+        break;
+    case OP_BRANCH_GREATER_THAN:
+        vm_op_branch(vm, VM_BRANCH_MODE_GREATER_THAN);
+        break;
+    case OP_BRANCH_EQUAL_TO:
+        vm_op_branch(vm, VM_BRANCH_MODE_EQUAL_TO);
+        break;
+    case OP_BRANCH_NOT_EQUAL_TO:
+        vm_op_branch(vm, VM_BRANCH_MODE_NOT_EQUAL_TO);
+        break;
 
-        case OP_CMP:
-            vm_op_cmp(vm);
-            break;
+    case OP_CMP:
+        vm_op_cmp(vm);
+        break;
 
-        case OP_CMPI:
-            vm_op_cmpi(vm);
-            break;
+    case OP_CMPI:
+        vm_op_cmpi(vm);
+        break;
 
-        case OP_ANDI:
-            vm_op_bitwisei(vm, VM_BITWISE_TYPE_AND);
-            break;
+    case OP_ANDI:
+        vm_op_bitwisei(vm, VM_BITWISE_TYPE_AND);
+        break;
 
-        case OP_ORI:
-            vm_op_bitwisei(vm, VM_BITWISE_TYPE_OR);
-            break;
+    case OP_ORI:
+        vm_op_bitwisei(vm, VM_BITWISE_TYPE_OR);
+        break;
 
-        case OP_NOT:
-            vm_op_not(vm);
-            break;
+    case OP_NOT:
+        vm_op_not(vm);
+        break;
 
-        default:
-            printf("Error: garbage value [0x%02X] in opcode stream\n", opcode);
-            break;
+    default:
+        printf("Error: garbage value [0x%02X] in opcode stream\n", opcode);
+        break;
     }
 }
 
@@ -430,9 +450,7 @@ void vm_run(vm_t *vm) {
     }
 }
 
-void vm_destroy(vm_t *vm) {
-    free(vm->memory);
-}
+void vm_destroy(vm_t *vm) { free(vm->memory); }
 
 uint8_t *load_program(char *filename, uint16_t *size) {
     FILE *fp = fopen(filename, "rb");
@@ -455,13 +473,64 @@ uint8_t *load_program(char *filename, uint16_t *size) {
     return buffer;
 }
 
+static char *program_path = NULL;
+
+void print_command_help() {
+    printf(
+        "Commands:\n"
+        "\t--step-delay [ms] - set a delay between each tick inside of the vm\n"
+        "\t--debug - enable debug mode\n"
+        "\t--prog [path] - the path of the program to load\n"
+    );
+}
+
+void check_arguments(vm_t *vm, int argc, char *argv[]) {
+    int i;
+    for (i = 1; i < argc; i++) {
+        char *arg = argv[i];
+        int arg_len = strlen(arg);
+
+        if (arg_len >= 3 && arg[0] == '-' && arg[1] == '-') {
+            arg += 2;
+        }
+
+        if (!strcmp(arg, "step-delay")) {
+            if (i + 1 <= argc) {
+                vm->step_delay_ms = atoi(argv[++i]);
+            }
+        }
+        else if (!strcmp(arg, "debug")) {
+            vm->flags |= VM_FLAG_STEP_DEBUG;
+        }
+        else if (!strcmp(arg, "prog")) {
+            if (i + 1 <= argc) {
+                program_path = argv[++i];
+            }
+        }
+        else if (!strcmp(arg, "help")) {
+            print_command_help();
+        }
+        else {
+            print_command_help();
+            exit(1);
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
     vm_t vm = vm_new(0xFFF0);
     // set up our stack
     vm.regs.sp = 0x5000;
 
+    check_arguments(&vm, argc, argv);
+
+    if (!program_path) {
+        printf("No program provided!\n");
+        return 0;
+    }
+
     uint16_t program_size;
-    uint8_t *program = load_program("demos/demo/demo.bin", &program_size);
+    uint8_t *program = load_program(program_path, &program_size);
     // load our program into the vm
     vm_load_program(&vm, 0x00, program, program_size);
 

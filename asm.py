@@ -1,6 +1,8 @@
 from enum import Enum, IntEnum
 import typing
 
+import getopt, sys
+
 class TokenType(Enum):
     NONE = -1
     IDENTIFIER = 0
@@ -134,7 +136,7 @@ class Macro:
         self.arguments: int = arguments
 
     def call_macro(self, main_tokens: list[Token], arguments, token_index: int) -> list[Token]:
-        tokens_to_remove: int = 1 + len(arguments) + len(arguments) - 1
+        tokens_to_remove: int = len(arguments) + len(arguments)
 
         for i in range(0, tokens_to_remove):
             main_tokens.pop(token_index)
@@ -278,7 +280,7 @@ class IPush(Instruction):
     def parse(self, cg):
         cg.write(Opcode.PUSH.value)
         reg_ident = cg.eat(TokenType.IDENTIFIER).as_str
-        print(f'ident: {reg_ident} :: {Register.get(reg_ident)}')
+        # print(f'ident: {reg_ident} :: {Register.get(reg_ident)}')
         # write only our destination register
         cg.write_reg(Register.NONE.value, Register.get(reg_ident))
 
@@ -286,9 +288,20 @@ class IPush(Instruction):
 class IPushi(Instruction):
     def parse(self, cg):
         cg.write(Opcode.PUSHI.value)
+
+
+        value_token: Token = cg.tokens[cg.index]
+
         # write value passed to instruction
-        value: int = cg.eat(TokenType.NUMBER).as_int
-        cg.write16(value)
+        if value_token.type == TokenType.IDENTIFIER:
+            label_ident: str = cg.eat(TokenType.IDENTIFIER).as_str
+            cg.labels_to_update.append(Label(label_ident, len(cg.source)))
+
+            # write a dummy value and update when the label is defined
+            cg.write16(0x00)
+        else:
+            value: int = cg.eat(TokenType.NUMBER).as_int
+            cg.write16(value)
 
 
 class IPop(Instruction):
@@ -578,14 +591,19 @@ def process_source_file(path: str) -> CodeGen:
 
     return cg
 
-
 def main():
-    path = 'demos/demo/demo'
-    cg: CodeGen = process_source_file(path + '.dS')
+    for i in range(1, len(sys.argv)):
+        # path = 'demos/print/helloworld'
+        path = sys.argv[i]
+        print(f'Assembling {path}...')
+        cg: CodeGen = process_source_file(path)
 
-    print(f'generated code: {cg.source}')
+        # print(f'generated code: {cg.source}')
 
-    cg.save(path + '.bin')
+        cg.save(path.removesuffix('.dS') + '.bin')
+
+
+
 
 
 if __name__ == "__main__":

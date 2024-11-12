@@ -10,8 +10,7 @@ movi 5, x1
 
 sys 2
 while x1
-    ;sys 1
+    sys 1
     continue x1
 
 b halt
-

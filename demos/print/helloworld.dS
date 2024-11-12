@@ -1,30 +1,32 @@
-; jump over our data
-b start
-
-.str "Hello, World!"
-
-start:
+sys     2             ; turn on debug mode
 
 push    sp
 pop     x3            ; save our stack pointer into x3
 
-pushi   0
-pop     sp            ; load zero into our stack pointer
+pushi   text
 
-addi    3, sp         ; skip our entry branch instructions, we only want our data
-addi    1, sp         ; go to the first character
+pop     sp            ; load our location into our stack pointer (where our data is stored)
+addi    1, sp         ; because we pop the character off of the stack, we need to add 1 to maintain our position and not load the previous byte.
+
+; note, registers and pops are all 16 bit words. we increment the stack pointer by 1 so we can load a byte as the lowest part of our word.
 
 printc:
-    pop     x0            ; pop what is currently on our stack into x0
-    andi    0x00FF, x0    ; check only the bottom byte
-    cmpi    0, x0         ; check if the word we loaded is zero
-    be      done          ; must be a null terminator, finish
-    sys     1             ; character print syscall, and x0 is our data
-    addi    3, sp         ; increment our pointer and correct from popping the word
+    pop     x0            ; pop the character from our stack into register x0
+
+    ; zero terminator check!
+    andi    0x00FF, x0    ; mask out the bottom byte of our 16 bit word
+    cmpi    0, x0         ; check if the character is zero
+    be      done          ; we have a null terminator, break out
+
+    ; call the print char syscall
+    sys     1             ; note: x0 is the data register!
+
+    addi    3, sp         ; popping is 16 bit, so we need to compensate by adding 2, plus incrementing to load the next character which will be 3.
     b       printc        ; print our next character
+
 done:
 
-push    x3
+push    x3            ; load our previous stack back into memory.
 pop     sp            ; return our stack pointer
 
 ; print a newline. because x0 will be zero, we can set it
@@ -32,6 +34,12 @@ pop     sp            ; return our stack pointer
 addi    10, x0
 sys     1
 
-
 sys     0             ; halt the VM
 
+; make sure the data does not get executed!
+
+text:
+    .str "Hello, World!"
+
+other_text:
+    .str "I'm back!"
